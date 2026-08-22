@@ -1,0 +1,171 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "施工扬尘与环境指标监测处置平台 API",
+    "version": "1.0.0",
+    "description": "本地设备接入、环境告警、设备治理、监管导出和受控附件 API"
+  },
+  "servers": [{ "url": "/api/v1" }],
+  "security": [{ "bearerAccess": [] }],
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "security": [],
+        "operationId": "login",
+        "summary": "签发短期访问令牌和可轮换刷新令牌",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginRequest" } } } },
+        "responses": { "200": { "description": "登录成功" }, "401": { "$ref": "#/components/responses/BusinessError" } }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "security": [],
+        "operationId": "rotateRefreshToken",
+        "summary": "原子撤销旧刷新令牌并签发替代令牌",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefreshRequest" } } } },
+        "responses": { "200": { "description": "轮换成功" }, "401": { "$ref": "#/components/responses/BusinessError" } }
+      }
+    },
+    "/telemetry/batches": {
+      "post": {
+        "operationId": "ingestTelemetryBatch",
+        "summary": "幂等接入一批本地设备观测",
+        "parameters": [{ "in": "header", "name": "Idempotency-Key", "schema": { "type": "string", "maxLength": 96 } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TelemetryBatch" } } } },
+        "responses": { "202": { "description": "逐项接入结果" }, "422": { "$ref": "#/components/responses/BusinessError" } }
+      }
+    },
+    "/sites/{site_id}/alerts": {
+      "get": {
+        "operationId": "listSiteAlerts",
+        "summary": "分页筛选工地告警",
+        "parameters": [
+          { "$ref": "#/components/parameters/SiteID" },
+          { "in": "query", "name": "page", "schema": { "type": "integer", "minimum": 1, "default": 1 } },
+          { "in": "query", "name": "page_size", "schema": { "type": "integer", "minimum": 1, "maximum": 200, "default": 20 } },
+          { "in": "query", "name": "sort", "schema": { "type": "string", "enum": ["started_at", "-started_at", "last_signal_at", "-last_signal_at", "status", "-status"] } },
+          { "in": "query", "name": "kind", "schema": { "type": "string", "enum": ["environmental-exceedance", "device-offline", "device-drift"] } },
+          { "in": "query", "name": "status", "schema": { "type": "string", "enum": ["open", "acknowledged", "dispatched", "recovering", "recovered", "closed"] } }
+        ],
+        "responses": { "200": { "description": "告警分页结果" }, "403": { "$ref": "#/components/responses/BusinessError" } }
+      }
+    },
+    "/alerts/{alert_id}": {
+      "patch": {
+        "operationId": "transitionAlert",
+        "summary": "推进告警处置状态",
+        "parameters": [{ "in": "path", "name": "alert_id", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AlertTransition" } } } },
+        "responses": { "200": { "description": "状态已更新" }, "403": { "$ref": "#/components/responses/BusinessError" }, "422": { "$ref": "#/components/responses/BusinessError" } }
+      }
+    },
+    "/devices/{device_id}/status": {
+      "patch": {
+        "operationId": "transitionDevice",
+        "summary": "更新设备生命周期状态",
+        "parameters": [{ "in": "path", "name": "device_id", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "设备状态已更新" }, "422": { "$ref": "#/components/responses/BusinessError" } }
+      }
+    },
+    "/sites/{site_id}/rules/versions": {
+      "post": {
+        "operationId": "createRuleVersion",
+        "summary": "创建绑定时区的规则版本",
+        "parameters": [{ "$ref": "#/components/parameters/SiteID" }],
+        "responses": { "201": { "description": "规则草稿已创建" }, "403": { "$ref": "#/components/responses/BusinessError" } }
+      }
+    },
+    "/sites/{site_id}/rules/{rule_id}/versions/{version}/activation": {
+      "patch": {
+        "operationId": "activateRuleVersion",
+        "summary": "激活指定规则版本并发布可靠事件",
+        "parameters": [
+          { "$ref": "#/components/parameters/SiteID" },
+          { "in": "path", "name": "rule_id", "required": true, "schema": { "type": "string" } },
+          { "in": "path", "name": "version", "required": true, "schema": { "type": "integer", "format": "int64", "minimum": 1 } }
+        ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RuleActivation" } } } },
+        "responses": { "200": { "description": "规则版本已激活" }, "409": { "$ref": "#/components/responses/BusinessError" }, "422": { "$ref": "#/components/responses/BusinessError" } }
+      }
+    },
+    "/sites/{site_id}/rules/{rule_id}/recalculations": {
+      "post": {
+        "operationId": "requestRuleRecalculation",
+        "summary": "提交保留旧结论的受控重算任务",
+        "parameters": [
+          { "$ref": "#/components/parameters/SiteID" },
+          { "in": "path", "name": "rule_id", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RuleRecalculation" } } } },
+        "responses": { "202": { "description": "重算任务已进入待处理队列" }, "403": { "$ref": "#/components/responses/BusinessError" }, "422": { "$ref": "#/components/responses/BusinessError" } }
+      }
+    },
+    "/sites/{site_id}/dashboard": {
+      "get": {
+        "operationId": "getSiteDashboard",
+        "summary": "获取实时环境概览",
+        "parameters": [{ "$ref": "#/components/parameters/SiteID" }],
+        "responses": { "200": { "description": "最新测点值和分类告警计数" } }
+      }
+    },
+    "/sites/{site_id}/trends": {
+      "get": {
+        "operationId": "getMetricTrend",
+        "summary": "按时间桶聚合测点趋势",
+        "parameters": [
+          { "$ref": "#/components/parameters/SiteID" },
+          { "in": "query", "name": "point_id", "required": true, "schema": { "type": "string" } },
+          { "in": "query", "name": "metric", "required": true, "schema": { "type": "string" } },
+          { "in": "query", "name": "start", "required": true, "schema": { "type": "string", "format": "date-time" } },
+          { "in": "query", "name": "end", "required": true, "schema": { "type": "string", "format": "date-time" } },
+          { "in": "query", "name": "bucket_seconds", "schema": { "type": "integer", "minimum": 1, "default": 300 } }
+        ],
+        "responses": { "200": { "description": "UTC 趋势序列" }, "422": { "$ref": "#/components/responses/BusinessError" } }
+      }
+    },
+    "/sites/{site_id}/regulatory-exports": {
+      "post": {
+        "operationId": "createRegulatoryExport",
+        "summary": "生成 CSV 或 JSON 监管导出",
+        "parameters": [{ "$ref": "#/components/parameters/SiteID" }],
+        "responses": { "202": { "description": "导出文件与摘要已生成" }, "403": { "$ref": "#/components/responses/BusinessError" } }
+      }
+    },
+    "/sites/{site_id}/files": {
+      "post": {
+        "operationId": "uploadSiteArtifact",
+        "summary": "上传受控维护或校准附件",
+        "parameters": [{ "$ref": "#/components/parameters/SiteID" }],
+        "requestBody": { "required": true, "content": { "multipart/form-data": { "schema": { "$ref": "#/components/schemas/FileUpload" } } } },
+        "responses": { "201": { "description": "文件已校验并保存" }, "403": { "$ref": "#/components/responses/BusinessError" }, "413": { "$ref": "#/components/responses/BusinessError" } }
+      }
+    },
+    "/sites/{site_id}/files/{file_id}": {
+      "get": {
+        "operationId": "downloadSiteArtifact",
+        "summary": "授权下载且不暴露磁盘路径",
+        "parameters": [
+          { "$ref": "#/components/parameters/SiteID" },
+          { "in": "path", "name": "file_id", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "文件字节和 SHA-256 响应头" }, "403": { "$ref": "#/components/responses/BusinessError" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": { "bearerAccess": { "type": "http", "scheme": "bearer" } },
+    "parameters": { "SiteID": { "in": "path", "name": "site_id", "required": true, "schema": { "type": "string" } } },
+    "schemas": {
+      "LoginRequest": { "type": "object", "required": ["username", "password"], "properties": { "username": { "type": "string", "minLength": 3 }, "password": { "type": "string", "minLength": 8, "format": "password" } } },
+      "RefreshRequest": { "type": "object", "required": ["refresh_token"], "properties": { "refresh_token": { "type": "string", "minLength": 40 } } },
+      "TelemetryBatch": { "type": "object", "required": ["batch_id", "samples"], "properties": { "batch_id": { "type": "string" }, "samples": { "type": "array", "minItems": 1, "maxItems": 500, "items": { "$ref": "#/components/schemas/TelemetrySample" } } } },
+      "TelemetrySample": { "type": "object", "required": ["device_code", "schema_id", "value", "sampled_at"], "properties": { "device_code": { "type": "string" }, "schema_id": { "type": "string" }, "value": { "type": "number", "format": "double" }, "sampled_at": { "type": "string", "format": "date-time" } } },
+      "AlertTransition": { "type": "object", "required": ["status", "reason", "expected_version"], "properties": { "status": { "type": "string", "enum": ["acknowledged", "dispatched", "recovering", "recovered", "closed", "open"] }, "reason": { "type": "string" }, "assignee_id": { "type": "string" }, "expected_version": { "type": "integer", "format": "int64", "minimum": 1 } } },
+      "RuleActivation": { "type": "object", "required": ["reason"], "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 500 } } },
+      "RuleRecalculation": { "type": "object", "required": ["from_version", "to_version", "window_start", "window_end", "reason"], "properties": { "from_version": { "type": "integer", "format": "int64", "minimum": 1 }, "to_version": { "type": "integer", "format": "int64", "minimum": 1 }, "window_start": { "type": "string", "format": "date-time" }, "window_end": { "type": "string", "format": "date-time" }, "reason": { "type": "string", "minLength": 3, "maxLength": 500 } } },
+      "FileUpload": { "type": "object", "required": ["file", "purpose"], "properties": { "file": { "type": "string", "format": "binary" }, "purpose": { "type": "string", "enum": ["maintenance-certificate"] } } },
+      "Error": { "type": "object", "required": ["code", "message", "field_errors", "request_id"], "properties": { "code": { "type": "string" }, "message": { "type": "string" }, "field_errors": { "type": "array", "items": { "type": "object" } }, "request_id": { "type": "string" } } }
+    },
+    "responses": { "BusinessError": { "description": "稳定业务错误", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } } }
+  }
+}

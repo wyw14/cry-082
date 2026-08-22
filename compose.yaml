@@ -1,0 +1,101 @@
+name: cry-082-local
+
+services:
+  telemetry-db:
+    build:
+      context: .
+      dockerfile: deploy/postgres.Dockerfile
+    environment:
+      POSTGRES_DB: dust
+      POSTGRES_USER: dust
+      POSTGRES_PASSWORD: dust
+    volumes:
+      - type: volume
+        source: timeseries-state
+        target: /var/lib/postgresql/data
+        volume:
+          nocopy: true
+    networks:
+      persistence:
+        aliases:
+          - dust-postgres
+
+  dust-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    init: true
+    environment:
+      APP_ENV: development
+      HTTP_ADDR: :8080
+      APP_TIMEZONE: Asia/Shanghai
+      ACCESS_TOKEN_KEY: local-compose-access-token-key-082-only
+      FILE_ROOT: /var/lib/dust/files
+      SEED_DEMO: "true"
+      DATABASE_URL: postgres://dust:dust@dust-postgres:5432/dust?sslmode=disable
+    depends_on:
+      telemetry-db:
+        condition: service_healthy
+        restart: true
+    ports:
+      - name: api-http
+        target: 8080
+        published: "8080"
+        protocol: tcp
+        app_protocol: http
+    volumes:
+      - type: volume
+        source: evidence-files
+        target: /var/lib/dust/files
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    security_opt:
+      - no-new-privileges=true
+    stop_grace_period: 20s
+    networks:
+      console-gateway:
+        aliases:
+          - dust-api
+      persistence: {}
+
+  site-console:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    depends_on:
+      dust-api:
+        condition: service_healthy
+        restart: true
+    ports:
+      - name: console-http
+        target: 8080
+        published: "5173"
+        protocol: tcp
+        app_protocol: http
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:size=16m,mode=0755
+      - /var/run:size=4m,mode=0755
+      - /tmp:size=8m,mode=1777
+    security_opt:
+      - no-new-privileges=true
+    networks:
+      operator-edge: {}
+      console-gateway: {}
+
+volumes:
+  timeseries-state:
+    name: cry-082-postgres-data
+  evidence-files:
+    name: cry-082-authorized-files
+
+networks:
+  operator-edge:
+    name: cry-082-operator-edge
+  console-gateway:
+    name: cry-082-console-gateway
+    internal: true
+  persistence:
+    name: cry-082-persistence
+    internal: true
