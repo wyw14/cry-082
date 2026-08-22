@@ -1,0 +1,13 @@
+.env
+.idea/
+.vscode/
+.DS_Store
+bin/
+coverage/
+dist/
+web/node_modules/
+web/dist/
+*.log
+*.db
+*.sqlite
+uploads/
