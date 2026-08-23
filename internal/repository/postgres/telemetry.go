@@ -44,8 +44,16 @@ func (s *Store) Append(ctx context.Context, value telemetry.Observation) error {
 	if value.CorrectionOf != "" {
 		correctionOf = value.CorrectionOf
 	}
-	_, err = s.db(ctx).Exec(ctx, `INSERT INTO observations(id,device_id,site_id,point_id,schema_id,metric,value,unit,sampled_at,received_at,corrected_at,correction_of,quality,quality_reasons,idempotency_key,source_batch_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`, value.ID, value.DeviceID, value.SiteID, value.PointID, value.SchemaID, value.Metric, value.Value, value.Unit, value.SampledAt, value.ReceivedAt, correctedAt, correctionOf, value.Quality, reasons, value.IdempotencyKey, value.SourceBatchID)
-	return err
+	command, err := s.db(ctx).Exec(ctx, `INSERT INTO observations(id,device_id,site_id,point_id,schema_id,metric,value,unit,sampled_at,received_at,corrected_at,correction_of,quality,quality_reasons,idempotency_key,source_batch_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) ON CONFLICT (idempotency_key) DO NOTHING`, value.ID, value.DeviceID, value.SiteID, value.PointID, value.SchemaID, value.Metric, value.Value, value.Unit, value.SampledAt, value.ReceivedAt, correctedAt, correctionOf, value.Quality, reasons, value.IdempotencyKey, value.SourceBatchID)
+	if err != nil {
+		return err
+	}
+	if command.RowsAffected() == 0 {
+		// A concurrent ingest already inserted this device/schema/sample identity.
+		// Treat it as a replay rather than a storage failure so callers can dedupe.
+		return telemetry.ErrObservationIdentityConflict
+	}
+	return nil
 }
 func scanObservation(row pgx.Row) (telemetry.Observation, error) {
 	var value telemetry.Observation

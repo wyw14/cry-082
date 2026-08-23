@@ -194,6 +194,15 @@ func (s *Service) processSample(ctx context.Context, batch Batch, index int, sam
 	observation.Quality, observation.QualityReasons = quality.Quality, quality.Reasons
 	item.ObservationID, item.Quality, item.Late = observation.ID, observation.Quality, quality.Late
 	if err := s.deps.Observations.Append(ctx, observation); err != nil {
+		// Two concurrent ingests for the same device/schema/sample can both pass the
+		// ExistsIdentity check before either commits. The loser loses the race on the
+		// unique idempotency identity: report it as a duplicate rather than an ingest
+		// rejection, mirroring the ExistsIdentity path above. Genuine storage errors
+		// still propagate unchanged so real ingest failures keep being counted.
+		if errors.Is(err, telemetry.ErrObservationIdentityConflict) {
+			item.Duplicate = true
+			return item, nil
+		}
 		return item, err
 	}
 	if err := deviceEntity.MarkSeen(batch.ReceivedAt); err != nil {

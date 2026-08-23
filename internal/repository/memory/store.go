@@ -288,7 +288,7 @@ func (s *Store) Append(ctx context.Context, value telemetry.Observation) error {
 		return errors.New("observation already exists")
 	}
 	if _, ok := s.telemetry.observationIdentities[value.IdempotencyKey]; ok {
-		return errors.New("observation identity already exists")
+		return telemetry.ErrObservationIdentityConflict
 	}
 	s.telemetry.observations[value.ID] = value
 	s.telemetry.observationIdentities[value.IdempotencyKey] = value.ID
