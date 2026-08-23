@@ -88,10 +88,11 @@ func (s *Service) Refresh(ctx context.Context, tokenID, raw string) (TokenPair, 
 	if err != nil {
 		return TokenPair{}, err
 	}
-	if err := s.repository.SaveRefreshToken(ctx, next); err != nil {
-		return TokenPair{}, err
-	}
-	if err := s.repository.SaveRefreshToken(ctx, current); err != nil {
+	// Rotate atomically: the repository enforces that the current token is still
+	// live (revoked_at IS NULL, digest matches) at write time via compare-and-swap,
+	// so only one concurrent refresh wins. The loser observes the winner's write
+	// and is rejected with ErrInvalidToken.
+	if err := s.repository.RotateRefreshToken(ctx, current, next); err != nil {
 		return TokenPair{}, err
 	}
 	return pair, nil
