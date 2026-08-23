@@ -85,7 +85,7 @@ func (m MergeIdentity) Key() (string, error) {
 		return "", ErrInvalidAlert
 	}
 	if m.Kind == KindEnvironmentalExceedance {
-		return fmt.Sprintf("%s:%s:%s", m.SiteID, m.PointID, m.RuleID), nil
+		return fmt.Sprintf("%s:%s:%s:%d", m.SiteID, m.PointID, m.RuleID, m.RuleVersion), nil
 	}
 	return fmt.Sprintf("%s:%s:%s", m.SiteID, m.PointID, m.Kind), nil
 }
