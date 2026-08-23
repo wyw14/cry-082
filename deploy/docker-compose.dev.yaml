@@ -1,0 +1,8 @@
+services:
+  database:
+    ports:
+      - "5432:5432"
+  api:
+    environment:
+      APP_ENV: development
+      REQUEST_TIMEOUT: 10s
