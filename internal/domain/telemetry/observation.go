@@ -60,7 +60,7 @@ func (s SeriesIdentity) Key() (string, error) {
 	if !s.Valid() {
 		return "", ErrInvalidObservation
 	}
-	return fmt.Sprintf("%s:%s", s.SiteID, s.Metric), nil
+	return fmt.Sprintf("%s:%s:%s", s.SiteID, s.PointID, s.Metric), nil
 }
 
 func Identity(deviceID, schemaID string, sampledAt time.Time) string {
