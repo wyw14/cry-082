@@ -39,8 +39,5 @@ func NewListScope(siteID string, kind Kind, status Status, offset, limit int) (L
 }
 
 func (s ListScope) EffectiveStatus() Status {
-	if s.Offset > 0 {
-		return ""
-	}
 	return s.Status
 }
