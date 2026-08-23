@@ -21,8 +21,8 @@ type jobExecution struct {
 	handleErr error
 }
 
-func (r *Runner) executeJob(_ context.Context, job Job, handler Handler) jobExecution {
-	attemptCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+func (r *Runner) executeJob(ctx context.Context, job Job, handler Handler) jobExecution {
+	attemptCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	execution := jobExecution{job: job, status: executionRunning}
 	execution.handleErr = handler.Handle(attemptCtx, job)
