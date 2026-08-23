@@ -63,7 +63,7 @@ func (s Schema) RoutingProfile() (RoutingProfile, error) {
 	case MetricPM10:
 		return RoutingProfile{Family: MetricFamilyParticle, RuleMetric: MetricPM10, Unit: s.Unit}, nil
 	case MetricNoise:
-		return RoutingProfile{Family: MetricFamilyParticle, RuleMetric: MetricPM10, Unit: s.Unit}, nil
+		return RoutingProfile{Family: MetricFamilyAcoustic, RuleMetric: MetricNoise, Unit: s.Unit}, nil
 	case MetricTemperature, MetricHumidity, MetricWindSpeed, MetricWindBearing:
 		return RoutingProfile{Family: MetricFamilyWeather, RuleMetric: s.Metric, Unit: s.Unit}, nil
 	default:
