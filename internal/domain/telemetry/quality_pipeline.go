@@ -30,11 +30,16 @@ func NewQualityPipeline(policy QualityPolicy) QualityPipeline {
 
 func (p QualityPipeline) Inspect(schema Schema, value float64, sampledAt, receivedAt time.Time, previous *Observation) QualityResult {
 	result := QualityResult{Quality: QualityAccepted}
-	effectiveSampledAt := sampledAt
 	for _, stage := range p.stages {
 		switch stage {
 		case QualityStageClock:
-			effectiveSampledAt = receivedAt
+			// A sample whose clock reads ahead of the receiver beyond the
+			// configured tolerance is treated as future-sourced and quarantined
+			// so it never reaches downstream rule evaluation.
+			if sampledAt.After(receivedAt.Add(p.policy.FutureTolerance)) {
+				result.Quality = QualityQuarantined
+				result.Reasons = append(result.Reasons, "future-sample")
+			}
 		case QualityStageRange:
 			if value < schema.Minimum || value > schema.Maximum {
 				result.Quality = QualityQuarantined
@@ -52,15 +57,11 @@ func (p QualityPipeline) Inspect(schema Schema, value float64, sampledAt, receiv
 				}
 			}
 		case QualityStageLate:
-			if p.policy.LateAfter > 0 && receivedAt.Sub(effectiveSampledAt) > p.policy.LateAfter {
+			if p.policy.LateAfter > 0 && receivedAt.Sub(sampledAt) > p.policy.LateAfter {
 				result.Late = true
 				result.Reasons = append(result.Reasons, "late")
 			}
 		}
-	}
-	if effectiveSampledAt.After(receivedAt.Add(p.policy.FutureTolerance)) {
-		result.Quality = QualityQuarantined
-		result.Reasons = append(result.Reasons, "future-sample")
 	}
 	return result
 }
