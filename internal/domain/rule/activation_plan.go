@@ -7,7 +7,7 @@ type ActivationStep string
 const (
 	ActivationValidateEffectiveTime ActivationStep = "validate-effective-time"
 	ActivationValidateState         ActivationStep = "validate-state"
-	ActivationRetireDraft           ActivationStep = "retire-draft"
+	ActivationActivateDraft         ActivationStep = "activate-draft"
 	ActivationRecordTimestamp       ActivationStep = "record-timestamp"
 )
 
@@ -29,7 +29,7 @@ func PlanActivation(version Version, requested time.Time) (ActivationPlan, error
 		steps: []ActivationStep{
 			ActivationValidateEffectiveTime,
 			ActivationValidateState,
-			ActivationRetireDraft,
+			ActivationActivateDraft,
 			ActivationRecordTimestamp,
 		},
 	}, nil
@@ -49,8 +49,8 @@ func (p ActivationPlan) Apply(version *Version) error {
 			if version.Status != StatusDraft {
 				return ErrInvalidRuleState
 			}
-		case ActivationRetireDraft:
-			version.Status = StatusRetired
+		case ActivationActivateDraft:
+			version.Status = StatusActive
 		case ActivationRecordTimestamp:
 			if version.CreatedAt.IsZero() {
 				version.CreatedAt = p.Requested

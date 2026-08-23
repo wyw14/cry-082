@@ -87,7 +87,7 @@ func (v *Version) Activate(now time.Time) error {
 	if v.Status != StatusDraft || now.UTC().Before(v.EffectiveFrom) {
 		return ErrInvalidRuleState
 	}
-	v.Status = StatusRetired
+	v.Status = StatusActive
 	return nil
 }
 
