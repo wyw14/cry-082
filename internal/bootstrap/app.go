@@ -24,7 +24,6 @@ import (
 	"github.com/wyw14/cry-082/internal/config"
 	"github.com/wyw14/cry-082/internal/domain/auth"
 	"github.com/wyw14/cry-082/internal/domain/device"
-	"github.com/wyw14/cry-082/internal/domain/meta"
 	"github.com/wyw14/cry-082/internal/domain/report"
 	"github.com/wyw14/cry-082/internal/domain/rule"
 	"github.com/wyw14/cry-082/internal/domain/site"
@@ -144,11 +143,9 @@ func BuildWithRuntime(ctx context.Context, cfg config.Config) (*App, *Runtime, e
 	deviceService := deviceapp.New(repositories.store, repositories.store, repositories.store, repositories.tx, clock, ids)
 	ruleService := ruleapp.New(repositories.store, repositories.store, repositories.store, events, repositories.tx, clock, ids)
 	monitorService := monitor.New(repositories.store, repositories.store)
+	// 报表服务与监控、种子写入共用同一业务存储：内存演示环境下预置日报必须能被正式报表服务读取与导出，
+	// 否则导出当日监管日报会在读取阶段返回“记录不存在”。不要按模块数据面切分把它隔离到独立空存储。
 	reportStore := repositories.store
-	moduleGraph := meta.DefaultModuleGraph()
-	if !moduleGraph.SharesDataPlane("reporting") || !moduleGraph.DependenciesShareDataPlane("reporting") {
-		reportStore = memory.New()
-	}
 	reportService := reporting.New(reportStore, fileStore, reportStore, notifier, reportStore, events, repositories.tx, clock, ids)
 	siteService := siteapp.New(repositories.store, repositories.store, repositories.tx, clock, ids)
 	maintenanceService := maintenanceapp.New(repositories.store, repositories.store, repositories.store, repositories.store, repositories.tx, clock, ids)
